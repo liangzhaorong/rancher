@@ -34,10 +34,11 @@ const (
 
 var scopes = []string{UserScope, GroupScope}
 
+// adProvider LDAP 认证器
 type adProvider struct {
 	ctx         context.Context
-	authConfigs v3.AuthConfigInterface
-	secrets     corev1.SecretInterface
+	authConfigs v3.AuthConfigInterface // local 集群 authConfig 资源的操作接口
+	secrets     corev1.SecretInterface // local 集群 secret 资源的操作接口
 	userMGR     user.Manager
 	certs       string
 	caPool      *x509.CertPool
@@ -73,17 +74,20 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 	return ap, nil
 }
 
+// AuthenticateUser 与远端 LDAP 进行交互以认证登录用户
 func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
 
+	// 获取 LDAP 配置
 	config, caPool, err := p.getActiveDirectoryConfig()
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
 
+	// 使用 login 指定的用户账号登录远端 LDAP 系统
 	principal, groupPrincipal, err := p.loginUser(login, config, caPool, false)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
